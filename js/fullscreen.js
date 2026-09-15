@@ -41443,9 +41443,12 @@ const OP = {
   COSTUME_DELETE: 'COSTUME_DELETE',
   COSTUME_CHANGE: 'COSTUME_CHANGE',
   COSTUME_UPDATE: 'COSTUME_UPDATE',
+  COSTUME_RENAME: 'COSTUME_RENAME',
   // Sound operations
   SOUND_ADD: 'SOUND_ADD',
   SOUND_DELETE: 'SOUND_DELETE',
+  SOUND_UPDATE: 'SOUND_UPDATE',
+  SOUND_RENAME: 'SOUND_RENAME',
   // Variable / List operations
   VARIABLE_CREATE: 'VARIABLE_CREATE',
   VARIABLE_DELETE: 'VARIABLE_DELETE',
@@ -41454,6 +41457,8 @@ const OP = {
   // Execution
   GREEN_FLAG: 'GREEN_FLAG',
   STOP_ALL: 'STOP_ALL',
+  // Extensions
+  EXTENSION_ADD: 'EXTENSION_ADD',
   // Cursor / presence
   CURSOR_MOVE: 'CURSOR_MOVE',
   // Project metadata
@@ -41518,6 +41523,24 @@ const deserializeOp = data => {
     _binaryPayload: data
   };
 };
+const arrayBufferToBase64 = buffer => {
+  let binary = '';
+  const bytes = new Uint8Array(buffer);
+  const len = bytes.byteLength;
+  for (let i = 0; i < len; i++) {
+    binary += String.fromCharCode(bytes[i]);
+  }
+  return window.btoa(binary);
+};
+const base64ToArrayBuffer = base64 => {
+  const binaryString = window.atob(base64);
+  const len = binaryString.length;
+  const bytes = new Uint8Array(len);
+  for (let i = 0; i < len; i++) {
+    bytes[i] = binaryString.charCodeAt(i);
+  }
+  return bytes.buffer;
+};
 
 /**
  * Maps Scratch VM / workspace event types to our operation types.
@@ -41530,6 +41553,8 @@ module.exports = {
   createOp,
   serializeOp,
   deserializeOp,
+  arrayBufferToBase64,
+  base64ToArrayBuffer,
   WORKSPACE_EVENT_MAP
 };
 
@@ -41754,7 +41779,7 @@ class CollabVMListener {
     var _this = this;
     if (this.vm._collabPatched) return;
     this.vm._collabPatched = true;
-    const methods = ['addSprite', 'deleteSprite', 'renameSprite', 'addCostume', 'deleteCostume', 'addSound', 'deleteSound'];
+    const methods = ['addSprite', 'deleteSprite', 'renameSprite', 'addCostume', 'deleteCostume', 'renameCostume', 'updateSvg', 'updateBitmap', 'addSound', 'deleteSound', 'renameSound', 'updateSoundBuffer', 'renameVariable'];
     this._originalVMMethods = {};
     methods.forEach(method => {
       if (typeof this.vm[method] === 'function') {
@@ -41782,10 +41807,70 @@ class CollabVMListener {
                 costumeData: arguments.length <= 1 ? undefined : arguments[1]
               }));
             } else if (method === 'deleteCostume') {
-              _this.collab.broadcastOp(createOp(OP.COSTUME_DELETE, {
-                costumeIndex: arguments.length <= 0 ? undefined : arguments[0]
-              })); // Wait, vm.deleteCostume is (spriteId, costumeIndex)
-              // Wait, vm.deleteCostume signature is usually (spriteId, costumeIndex) or something else. I will fix the payload below.
+              // Dummy, handled below
+            } else if (method === 'renameCostume') {
+              _this.collab.broadcastOp(createOp(OP.COSTUME_RENAME, {
+                costumeIndex: arguments.length <= 0 ? undefined : arguments[0],
+                newName: arguments.length <= 1 ? undefined : arguments[1]
+              }));
+            } else if (method === 'renameSound') {
+              _this.collab.broadcastOp(createOp(OP.SOUND_RENAME, {
+                soundIndex: arguments.length <= 0 ? undefined : arguments[0],
+                newName: arguments.length <= 1 ? undefined : arguments[1]
+              }));
+            } else if (method === 'renameVariable') {
+              _this.collab.broadcastOp(createOp(OP.VARIABLE_RENAME, {
+                targetId: arguments.length <= 0 ? undefined : arguments[0],
+                varId: arguments.length <= 1 ? undefined : arguments[1],
+                newName: arguments.length <= 2 ? undefined : arguments[2]
+              }));
+            } else if (method === 'updateSvg' || method === 'updateBitmap') {
+              // Sync painted drawings. Extract the updated asset and convert to base64.
+              if (_this.vm.editingTarget) {
+                const costumeIndex = arguments.length <= 0 ? undefined : arguments[0];
+                const costume = _this.vm.editingTarget.getCostumes()[costumeIndex];
+                if (costume && costume.asset && costume.asset.data) {
+                  const {
+                    arrayBufferToBase64
+                  } = __webpack_require__(/*! ./operations */ "./src/lib/collab/operations.js");
+                  const base64Data = arrayBufferToBase64(costume.asset.data);
+                  _this.collab.broadcastOp(createOp(OP.COSTUME_UPDATE, {
+                    targetId: _this.vm.editingTarget.id,
+                    costumeIndex: costumeIndex,
+                    costumeData: {
+                      name: costume.name,
+                      dataFormat: costume.dataFormat,
+                      rotationCenterX: costume.rotationCenterX,
+                      rotationCenterY: costume.rotationCenterY,
+                      bitmapResolution: costume.bitmapResolution
+                    },
+                    assetDataBase64: base64Data
+                  }));
+                }
+              }
+            } else if (method === 'updateSoundBuffer') {
+              // Sync edited sounds. Extract the updated sound asset.
+              if (_this.vm.editingTarget) {
+                const soundIndex = arguments.length <= 0 ? undefined : arguments[0];
+                const sound = _this.vm.editingTarget.getSounds()[soundIndex];
+                if (sound && sound.asset && sound.asset.data) {
+                  const {
+                    arrayBufferToBase64
+                  } = __webpack_require__(/*! ./operations */ "./src/lib/collab/operations.js");
+                  const base64Data = arrayBufferToBase64(sound.asset.data);
+                  _this.collab.broadcastOp(createOp(OP.SOUND_UPDATE, {
+                    targetId: _this.vm.editingTarget.id,
+                    soundIndex: soundIndex,
+                    soundData: {
+                      name: sound.name,
+                      dataFormat: sound.dataFormat,
+                      rate: sound.rate,
+                      sampleCount: sound.sampleCount
+                    },
+                    assetDataBase64: base64Data
+                  }));
+                }
+              }
             }
           }
           return result;
@@ -41824,6 +41909,21 @@ class CollabVMListener {
       }
       return result;
     };
+
+    // Patch extensions
+    if (this.vm.extensionManager && !this.vm.extensionManager._collabPatched) {
+      this.vm.extensionManager._collabPatched = true;
+      this._originalLoadExtensionURL = this.vm.extensionManager.loadExtensionURL.bind(this.vm.extensionManager);
+      this.vm.extensionManager.loadExtensionURL = extensionURL => {
+        const result = this._originalLoadExtensionURL(extensionURL);
+        if (this._attached && !this.collab.isRemoteOperation) {
+          this.collab.broadcastOp(createOp(OP.EXTENSION_ADD, {
+            extensionURL
+          }));
+        }
+        return result;
+      };
+    }
   }
   _unpatchVMMethods() {
     if (!this._originalVMMethods) return;
@@ -41831,6 +41931,12 @@ class CollabVMListener {
       this.vm[method] = this._originalVMMethods[method];
     }
     this.vm._collabPatched = false;
+    this._originalVMMethods = null;
+    if (this.vm.extensionManager && this._originalLoadExtensionURL) {
+      this.vm.extensionManager.loadExtensionURL = this._originalLoadExtensionURL;
+      this.vm.extensionManager._collabPatched = false;
+      this._originalLoadExtensionURL = null;
+    }
     this._originalVMMethods = null;
   }
   _handleBlockEvent(e) {
@@ -41909,6 +42015,21 @@ class CollabVMListener {
         case OP.VARIABLE_RENAME:
           this._applyVariableRename(op.payload);
           break;
+        case OP.COSTUME_UPDATE:
+          this._applyCostumeUpdate(op.payload);
+          break;
+        case OP.COSTUME_RENAME:
+          this._applyCostumeRename(op.payload);
+          break;
+        case OP.SOUND_UPDATE:
+          this._applySoundUpdate(op.payload);
+          break;
+        case OP.SOUND_RENAME:
+          this._applySoundRename(op.payload);
+          break;
+        case OP.EXTENSION_ADD:
+          this._applyExtensionAdd(op.payload);
+          break;
         case OP.PROJECT_RENAME:
           this.vm.emit('PROJECT_TITLE_CHANGED', op.payload.name);
           break;
@@ -41952,7 +42073,15 @@ class CollabVMListener {
   _applySpriteAdd(payload) {
     // The sprite data should be a JSON blob we can pass to addSprite
     if (payload.spriteJson) {
-      this.vm.addSprite(payload.spriteJson);
+      const oldSetEditingTarget = this.vm.setEditingTarget;
+      // Prevent the VM from auto-selecting the new sprite
+      this.vm.setEditingTarget = () => {};
+      this.vm.addSprite(payload.spriteJson).then(() => {
+        this.vm.setEditingTarget = oldSetEditingTarget;
+      }).catch(e => {
+        this.vm.setEditingTarget = oldSetEditingTarget;
+        console.error('Failed to add remote sprite:', e);
+      });
     }
   }
   _applySpriteDelete(payload) {
@@ -42009,9 +42138,89 @@ class CollabVMListener {
     this.vm.deleteCostume(target.id, payload.costumeIndex);
   }
   _applyCostumeChange(payload) {
-    const target = this._findTarget(payload.targetId);
-    if (!target) return;
-    target.setCostume(payload.costumeIndex);
+    const target = this.vm.runtime.getTargetById(payload.targetId);
+    if (target) {
+      target.setCostume(payload.costumeIndex);
+    }
+  }
+  _applyCostumeUpdate(payload) {
+    const target = this.vm.runtime.getTargetById(payload.targetId);
+    if (target && payload.costumeData && payload.assetDataBase64) {
+      const {
+        base64ToArrayBuffer
+      } = __webpack_require__(/*! ./operations */ "./src/lib/collab/operations.js");
+      const assetData = base64ToArrayBuffer(payload.assetDataBase64);
+      const storage = this.vm.runtime.storage;
+      const assetType = payload.costumeData.dataFormat === 'svg' ? storage.AssetType.ImageVector : storage.AssetType.ImageBitmap;
+      const asset = storage.createAsset(assetType, payload.costumeData.dataFormat, assetData, null, true // generate md5
+      );
+      const costume = target.getCostumes()[payload.costumeIndex];
+      if (costume) {
+        costume.asset = asset;
+        costume.assetId = asset.assetId;
+        costume.md5 = "".concat(asset.assetId, ".").concat(payload.costumeData.dataFormat);
+        costume.name = payload.costumeData.name;
+        costume.dataFormat = payload.costumeData.dataFormat;
+        costume.rotationCenterX = payload.costumeData.rotationCenterX;
+        costume.rotationCenterY = payload.costumeData.rotationCenterY;
+        costume.bitmapResolution = payload.costumeData.bitmapResolution;
+        if (this.vm.runtime.renderer) {
+          if (assetType === storage.AssetType.ImageVector) {
+            const svg = new TextDecoder().decode(assetData);
+            this.vm.runtime.renderer.updateSVGSkin(costume.skinId, svg, [costume.rotationCenterX, costume.rotationCenterY]);
+            costume.size = this.vm.runtime.renderer.getSkinSize(costume.skinId);
+          } else {
+            // For bitmap updates, Scratch handles creating skins during rendering usually
+          }
+        }
+        this.vm.emitTargetsUpdate();
+      }
+    }
+  }
+  _applyCostumeRename(payload) {
+    if (this.vm.renameCostume) {
+      this.vm.renameCostume(payload.costumeIndex, payload.newName);
+    }
+  }
+  _applySoundRename(payload) {
+    if (this.vm.renameSound) {
+      this.vm.renameSound(payload.soundIndex, payload.newName);
+    }
+  }
+  _applyVariableRename(payload) {
+    const target = this.vm.runtime.getTargetById(payload.targetId);
+    if (target) {
+      target.renameVariable(payload.varId, payload.newName);
+      this.vm.emitTargetsUpdate();
+    }
+  }
+  _applyExtensionAdd(payload) {
+    if (this.vm.extensionManager && payload.extensionURL) {
+      this.vm.extensionManager.loadExtensionURL(payload.extensionURL);
+    }
+  }
+  _applySoundUpdate(payload) {
+    const target = this.vm.runtime.getTargetById(payload.targetId);
+    if (target && payload.soundData && payload.assetDataBase64) {
+      const {
+        base64ToArrayBuffer
+      } = __webpack_require__(/*! ./operations */ "./src/lib/collab/operations.js");
+      const assetData = base64ToArrayBuffer(payload.assetDataBase64);
+      const storage = this.vm.runtime.storage;
+      const asset = storage.createAsset(storage.AssetType.Sound, payload.soundData.dataFormat, assetData, null, true // generate md5
+      );
+      const sound = target.getSounds()[payload.soundIndex];
+      if (sound) {
+        sound.asset = asset;
+        sound.assetId = asset.assetId;
+        sound.md5 = "".concat(asset.assetId, ".").concat(payload.soundData.dataFormat);
+        sound.name = payload.soundData.name;
+        sound.dataFormat = payload.soundData.dataFormat;
+        sound.rate = payload.soundData.rate;
+        sound.sampleCount = payload.soundData.sampleCount;
+        this.vm.emitTargetsUpdate();
+      }
+    }
   }
   _applySoundAdd(payload) {
     const target = this._findTarget(payload.targetId);
