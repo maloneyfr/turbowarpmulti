@@ -149,8 +149,10 @@ class CollabVMListener {
 
         const methods = [
             'addSprite', 'deleteSprite', 'renameSprite',
-            'addCostume', 'deleteCostume',
-            'addSound', 'deleteSound'
+            'addCostume', 'deleteCostume', 'renameCostume',
+            'updateSvg', 'updateBitmap',
+            'addSound', 'deleteSound', 'renameSound',
+            'updateSoundBuffer', 'renameVariable'
         ];
 
         this._originalVMMethods = {};
@@ -173,8 +175,58 @@ class CollabVMListener {
                         } else if (method === 'addCostume') {
                             this.collab.broadcastOp(createOp(OP.COSTUME_ADD, { targetId: args[2], costumeData: args[1] }));
                         } else if (method === 'deleteCostume') {
-                            this.collab.broadcastOp(createOp(OP.COSTUME_DELETE, { costumeIndex: args[0] })); // Wait, vm.deleteCostume is (spriteId, costumeIndex)
-                            // Wait, vm.deleteCostume signature is usually (spriteId, costumeIndex) or something else. I will fix the payload below.
+                            // Dummy, handled below
+                        } else if (method === 'renameCostume') {
+                            this.collab.broadcastOp(createOp(OP.COSTUME_RENAME, { costumeIndex: args[0], newName: args[1] }));
+                        } else if (method === 'renameSound') {
+                            this.collab.broadcastOp(createOp(OP.SOUND_RENAME, { soundIndex: args[0], newName: args[1] }));
+                        } else if (method === 'renameVariable') {
+                            this.collab.broadcastOp(createOp(OP.VARIABLE_RENAME, { targetId: args[0], varId: args[1], newName: args[2] }));
+                        } else if (method === 'updateSvg' || method === 'updateBitmap') {
+                            // Sync painted drawings. Extract the updated asset and convert to base64.
+                            if (this.vm.editingTarget) {
+                                const costumeIndex = args[0];
+                                const costume = this.vm.editingTarget.getCostumes()[costumeIndex];
+                                if (costume && costume.asset && costume.asset.data) {
+                                    const { arrayBufferToBase64 } = require('./operations');
+                                    const base64Data = arrayBufferToBase64(costume.asset.data);
+                                    
+                                    this.collab.broadcastOp(createOp(OP.COSTUME_UPDATE, {
+                                        targetId: this.vm.editingTarget.id,
+                                        costumeIndex: costumeIndex,
+                                        costumeData: {
+                                            name: costume.name,
+                                            dataFormat: costume.dataFormat,
+                                            rotationCenterX: costume.rotationCenterX,
+                                            rotationCenterY: costume.rotationCenterY,
+                                            bitmapResolution: costume.bitmapResolution
+                                        },
+                                        assetDataBase64: base64Data
+                                    }));
+                                }
+                            }
+                        } else if (method === 'updateSoundBuffer') {
+                            // Sync edited sounds. Extract the updated sound asset.
+                            if (this.vm.editingTarget) {
+                                const soundIndex = args[0];
+                                const sound = this.vm.editingTarget.getSounds()[soundIndex];
+                                if (sound && sound.asset && sound.asset.data) {
+                                    const { arrayBufferToBase64 } = require('./operations');
+                                    const base64Data = arrayBufferToBase64(sound.asset.data);
+                                    
+                                    this.collab.broadcastOp(createOp(OP.SOUND_UPDATE, {
+                                        targetId: this.vm.editingTarget.id,
+                                        soundIndex: soundIndex,
+                                        soundData: {
+                                            name: sound.name,
+                                            dataFormat: sound.dataFormat,
+                                            rate: sound.rate,
+                                            sampleCount: sound.sampleCount
+                                        },
+                                        assetDataBase64: base64Data
+                                    }));
+                                }
+                            }
                         }
                     }
                     return result;
@@ -206,6 +258,19 @@ class CollabVMListener {
             }
             return result;
         };
+        
+        // Patch extensions
+        if (this.vm.extensionManager && !this.vm.extensionManager._collabPatched) {
+            this.vm.extensionManager._collabPatched = true;
+            this._originalLoadExtensionURL = this.vm.extensionManager.loadExtensionURL.bind(this.vm.extensionManager);
+            this.vm.extensionManager.loadExtensionURL = (extensionURL) => {
+                const result = this._originalLoadExtensionURL(extensionURL);
+                if (this._attached && !this.collab.isRemoteOperation) {
+                    this.collab.broadcastOp(createOp(OP.EXTENSION_ADD, { extensionURL }));
+                }
+                return result;
+            };
+        }
     }
 
     _unpatchVMMethods () {
@@ -214,6 +279,13 @@ class CollabVMListener {
             this.vm[method] = this._originalVMMethods[method];
         }
         this.vm._collabPatched = false;
+        this._originalVMMethods = null;
+        
+        if (this.vm.extensionManager && this._originalLoadExtensionURL) {
+            this.vm.extensionManager.loadExtensionURL = this._originalLoadExtensionURL;
+            this.vm.extensionManager._collabPatched = false;
+            this._originalLoadExtensionURL = null;
+        }
         this._originalVMMethods = null;
     }
 
@@ -295,6 +367,21 @@ class CollabVMListener {
             case OP.VARIABLE_RENAME:
                 this._applyVariableRename(op.payload);
                 break;
+            case OP.COSTUME_UPDATE:
+                this._applyCostumeUpdate(op.payload);
+                break;
+            case OP.COSTUME_RENAME:
+                this._applyCostumeRename(op.payload);
+                break;
+            case OP.SOUND_UPDATE:
+                this._applySoundUpdate(op.payload);
+                break;
+            case OP.SOUND_RENAME:
+                this._applySoundRename(op.payload);
+                break;
+            case OP.EXTENSION_ADD:
+                this._applyExtensionAdd(op.payload);
+                break;
             case OP.PROJECT_RENAME:
                 this.vm.emit('PROJECT_TITLE_CHANGED', op.payload.name);
                 break;
@@ -341,7 +428,16 @@ class CollabVMListener {
     _applySpriteAdd (payload) {
         // The sprite data should be a JSON blob we can pass to addSprite
         if (payload.spriteJson) {
-            this.vm.addSprite(payload.spriteJson);
+            const oldSetEditingTarget = this.vm.setEditingTarget;
+            // Prevent the VM from auto-selecting the new sprite
+            this.vm.setEditingTarget = () => {};
+            
+            this.vm.addSprite(payload.spriteJson).then(() => {
+                this.vm.setEditingTarget = oldSetEditingTarget;
+            }).catch(e => {
+                this.vm.setEditingTarget = oldSetEditingTarget;
+                console.error('Failed to add remote sprite:', e);
+            });
         }
     }
 
@@ -410,9 +506,107 @@ class CollabVMListener {
     }
 
     _applyCostumeChange (payload) {
-        const target = this._findTarget(payload.targetId);
-        if (!target) return;
-        target.setCostume(payload.costumeIndex);
+        const target = this.vm.runtime.getTargetById(payload.targetId);
+        if (target) {
+            target.setCostume(payload.costumeIndex);
+        }
+    }
+
+    _applyCostumeUpdate (payload) {
+        const target = this.vm.runtime.getTargetById(payload.targetId);
+        if (target && payload.costumeData && payload.assetDataBase64) {
+            const { base64ToArrayBuffer } = require('./operations');
+            const assetData = base64ToArrayBuffer(payload.assetDataBase64);
+            const storage = this.vm.runtime.storage;
+            const assetType = payload.costumeData.dataFormat === 'svg' ? storage.AssetType.ImageVector : storage.AssetType.ImageBitmap;
+            
+            const asset = storage.createAsset(
+                assetType,
+                payload.costumeData.dataFormat,
+                assetData,
+                null,
+                true // generate md5
+            );
+            
+            const costume = target.getCostumes()[payload.costumeIndex];
+            if (costume) {
+                costume.asset = asset;
+                costume.assetId = asset.assetId;
+                costume.md5 = `${asset.assetId}.${payload.costumeData.dataFormat}`;
+                costume.name = payload.costumeData.name;
+                costume.dataFormat = payload.costumeData.dataFormat;
+                costume.rotationCenterX = payload.costumeData.rotationCenterX;
+                costume.rotationCenterY = payload.costumeData.rotationCenterY;
+                costume.bitmapResolution = payload.costumeData.bitmapResolution;
+                
+                if (this.vm.runtime.renderer) {
+                    if (assetType === storage.AssetType.ImageVector) {
+                        const svg = (new TextDecoder()).decode(assetData);
+                        this.vm.runtime.renderer.updateSVGSkin(costume.skinId, svg, [costume.rotationCenterX, costume.rotationCenterY]);
+                        costume.size = this.vm.runtime.renderer.getSkinSize(costume.skinId);
+                    } else {
+                        // For bitmap updates, Scratch handles creating skins during rendering usually
+                    }
+                }
+                this.vm.emitTargetsUpdate();
+            }
+        }
+    }
+
+    _applyCostumeRename (payload) {
+        if (this.vm.renameCostume) {
+            this.vm.renameCostume(payload.costumeIndex, payload.newName);
+        }
+    }
+
+    _applySoundRename (payload) {
+        if (this.vm.renameSound) {
+            this.vm.renameSound(payload.soundIndex, payload.newName);
+        }
+    }
+
+    _applyVariableRename (payload) {
+        const target = this.vm.runtime.getTargetById(payload.targetId);
+        if (target) {
+            target.renameVariable(payload.varId, payload.newName);
+            this.vm.emitTargetsUpdate();
+        }
+    }
+
+    _applyExtensionAdd (payload) {
+        if (this.vm.extensionManager && payload.extensionURL) {
+            this.vm.extensionManager.loadExtensionURL(payload.extensionURL);
+        }
+    }
+
+    _applySoundUpdate (payload) {
+        const target = this.vm.runtime.getTargetById(payload.targetId);
+        if (target && payload.soundData && payload.assetDataBase64) {
+            const { base64ToArrayBuffer } = require('./operations');
+            const assetData = base64ToArrayBuffer(payload.assetDataBase64);
+            const storage = this.vm.runtime.storage;
+            
+            const asset = storage.createAsset(
+                storage.AssetType.Sound,
+                payload.soundData.dataFormat,
+                assetData,
+                null,
+                true // generate md5
+            );
+            
+            const sound = target.getSounds()[payload.soundIndex];
+            if (sound) {
+                sound.asset = asset;
+                sound.assetId = asset.assetId;
+                sound.md5 = `${asset.assetId}.${payload.soundData.dataFormat}`;
+                sound.name = payload.soundData.name;
+                sound.dataFormat = payload.soundData.dataFormat;
+                sound.rate = payload.soundData.rate;
+                sound.sampleCount = payload.soundData.sampleCount;
+                
+                this.vm.emitTargetsUpdate();
+            }
+        }
     }
 
     _applySoundAdd (payload) {

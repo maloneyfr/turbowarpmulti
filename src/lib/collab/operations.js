@@ -30,10 +30,13 @@ const OP = {
     COSTUME_DELETE: 'COSTUME_DELETE',
     COSTUME_CHANGE: 'COSTUME_CHANGE',
     COSTUME_UPDATE: 'COSTUME_UPDATE',
+    COSTUME_RENAME: 'COSTUME_RENAME',
 
     // Sound operations
     SOUND_ADD: 'SOUND_ADD',
     SOUND_DELETE: 'SOUND_DELETE',
+    SOUND_UPDATE: 'SOUND_UPDATE',
+    SOUND_RENAME: 'SOUND_RENAME',
 
     // Variable / List operations
     VARIABLE_CREATE: 'VARIABLE_CREATE',
@@ -44,6 +47,9 @@ const OP = {
     // Execution
     GREEN_FLAG: 'GREEN_FLAG',
     STOP_ALL: 'STOP_ALL',
+
+    // Extensions
+    EXTENSION_ADD: 'EXTENSION_ADD',
 
     // Cursor / presence
     CURSOR_MOVE: 'CURSOR_MOVE',
@@ -104,6 +110,26 @@ const deserializeOp = data => {
     return {_binaryPayload: data};
 };
 
+const arrayBufferToBase64 = buffer => {
+    let binary = '';
+    const bytes = new Uint8Array(buffer);
+    const len = bytes.byteLength;
+    for (let i = 0; i < len; i++) {
+        binary += String.fromCharCode(bytes[i]);
+    }
+    return window.btoa(binary);
+};
+
+const base64ToArrayBuffer = base64 => {
+    const binaryString = window.atob(base64);
+    const len = binaryString.length;
+    const bytes = new Uint8Array(len);
+    for (let i = 0; i < len; i++) {
+        bytes[i] = binaryString.charCodeAt(i);
+    }
+    return bytes.buffer;
+};
+
 /**
  * Maps Scratch VM / workspace event types to our operation types.
  */
@@ -116,5 +142,7 @@ module.exports = {
     createOp,
     serializeOp,
     deserializeOp,
+    arrayBufferToBase64,
+    base64ToArrayBuffer,
     WORKSPACE_EVENT_MAP
 };
