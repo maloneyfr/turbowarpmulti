@@ -138,84 +138,12 @@ class CollabVMListener {
         if (!this.collab.isInSession()) return;
         if (!this.vm.editingTarget) return;
 
-        const targetId = this.vm.editingTarget.id;
+        // Skip UI events
+        if (e.type === 'ui' || e.element === 'stackclick') return;
 
-        switch (e.type) {
-        case 'create': {
-            const op = createOp(OP.BLOCK_CREATE, {
-                targetId,
-                blockXml: e.xml ? (new XMLSerializer()).serializeToString(e.xml) : null,
-                blockJson: e.json
-            }, this.collab.myPeerId);
+        if (typeof e.toJson === 'function') {
+            const op = createOp(OP.BLOCK_EVENT, e.toJson(), this.collab.myPeerId);
             this.collab.broadcastOp(op);
-            break;
-        }
-        case 'change': {
-            const op = createOp(OP.BLOCK_CHANGE, {
-                targetId,
-                blockId: e.blockId,
-                element: e.element,
-                name: e.name,
-                newValue: e.newValue,
-                oldValue: e.oldValue
-            }, this.collab.myPeerId);
-            this.collab.broadcastOp(op);
-            break;
-        }
-        case 'move': {
-            const op = createOp(OP.BLOCK_MOVE, {
-                targetId,
-                blockId: e.blockId,
-                newParentId: e.newParentId,
-                newInputName: e.newInputName,
-                newCoordinate: e.newCoordinate,
-                oldParentId: e.oldParentId,
-                oldInputName: e.oldInputName,
-                oldCoordinate: e.oldCoordinate
-            }, this.collab.myPeerId);
-            this.collab.broadcastOp(op);
-            break;
-        }
-        case 'delete': {
-            const op = createOp(OP.BLOCK_DELETE, {
-                targetId,
-                blockId: e.blockId,
-                blockXml: e.oldXml ? (new XMLSerializer()).serializeToString(e.oldXml) : null,
-                blockJson: e.oldJson
-            }, this.collab.myPeerId);
-            this.collab.broadcastOp(op);
-            break;
-        }
-        case 'var_create': {
-            const op = createOp(OP.VARIABLE_CREATE, {
-                targetId,
-                varId: e.varId,
-                varName: e.varName,
-                varType: e.varType
-            }, this.collab.myPeerId);
-            this.collab.broadcastOp(op);
-            break;
-        }
-        case 'var_delete': {
-            const op = createOp(OP.VARIABLE_DELETE, {
-                targetId,
-                varId: e.varId
-            }, this.collab.myPeerId);
-            this.collab.broadcastOp(op);
-            break;
-        }
-        case 'var_rename': {
-            const op = createOp(OP.VARIABLE_RENAME, {
-                targetId,
-                varId: e.varId,
-                oldName: e.oldName,
-                newName: e.newName
-            }, this.collab.myPeerId);
-            this.collab.broadcastOp(op);
-            break;
-        }
-        default:
-            break;
         }
     }
 
@@ -245,17 +173,8 @@ class CollabVMListener {
         this.collab._isRemoteOperation = true;
         try {
             switch (op.type) {
-            case OP.BLOCK_CREATE:
-                this._applyBlockCreate(op.payload);
-                break;
-            case OP.BLOCK_CHANGE:
-                this._applyBlockChange(op.payload);
-                break;
-            case OP.BLOCK_MOVE:
-                this._applyBlockMove(op.payload);
-                break;
-            case OP.BLOCK_DELETE:
-                this._applyBlockDelete(op.payload);
+            case OP.BLOCK_EVENT:
+                this._applyBlockEvent(op.payload);
                 break;
             case OP.SPRITE_ADD:
                 this._applySpriteAdd(op.payload);
@@ -305,8 +224,12 @@ class CollabVMListener {
             this.collab._isRemoteOperation = false;
         }
 
-        // Force workspace and UI to refresh
-        this.vm.emitWorkspaceUpdate();
+        // Only force full workspace refresh for structural changes
+        if (op.type !== OP.BLOCK_EVENT && op.type !== OP.SPRITE_PROPERTY && op.type !== OP.CURSOR_MOVE) {
+            this.vm.emitWorkspaceUpdate();
+        }
+        
+        // Always update targets and redraw stage
         this.vm.emitTargetsUpdate(false);
         this.vm.runtime.requestRedraw();
     }
@@ -315,55 +238,18 @@ class CollabVMListener {
         return this.vm.runtime.targets.find(t => t.id === targetId);
     }
 
-    _applyBlockCreate (payload) {
-        const target = this._findTarget(payload.targetId);
-        if (!target) return;
-
-        if (payload.blockJson) {
-            // Use the JSON representation to create blocks
-            const blocks = payload.blockJson;
-            if (typeof blocks === 'object') {
-                for (const id in blocks) {
-                    if (blocks.hasOwnProperty(id)) {
-                        target.blocks.createBlock(blocks[id]);
-                    }
-                }
-            }
+    _applyBlockEvent (payload) {
+        if (!window.ScratchBlocks) return;
+        const workspace = window.ScratchBlocks.getMainWorkspace();
+        if (!workspace) return;
+        try {
+            const event = window.ScratchBlocks.Events.fromJson(payload, workspace);
+            // Run forward natively. This triggers workspace change events which the patched blockListener
+            // will catch but NOT broadcast because this.collab._isRemoteOperation is true.
+            event.run(true);
+        } catch (err) {
+            console.error('Failed to apply remote block event:', err);
         }
-    }
-
-    _applyBlockChange (payload) {
-        const target = this._findTarget(payload.targetId);
-        if (!target) return;
-
-        target.blocks.changeBlock({
-            id: payload.blockId,
-            element: payload.element,
-            name: payload.name,
-            value: payload.newValue
-        }, this.vm.runtime);
-    }
-
-    _applyBlockMove (payload) {
-        const target = this._findTarget(payload.targetId);
-        if (!target) return;
-
-        target.blocks.moveBlock({
-            id: payload.blockId,
-            newParent: payload.newParentId,
-            newInput: payload.newInputName,
-            newCoordinate: payload.newCoordinate,
-            oldParent: payload.oldParentId,
-            oldInput: payload.oldInputName,
-            oldCoordinate: payload.oldCoordinate
-        });
-    }
-
-    _applyBlockDelete (payload) {
-        const target = this._findTarget(payload.targetId);
-        if (!target) return;
-
-        target.blocks.deleteBlock(payload.blockId);
     }
 
     _applySpriteAdd (payload) {

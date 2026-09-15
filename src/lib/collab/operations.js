@@ -15,11 +15,8 @@ const OP = {
     KICK: 'KICK',
 
     // Block operations
-    BLOCK_CREATE: 'BLOCK_CREATE',
-    BLOCK_CHANGE: 'BLOCK_CHANGE',
-    BLOCK_MOVE: 'BLOCK_MOVE',
-    BLOCK_DELETE: 'BLOCK_DELETE',
-    BLOCK_DRAG_UPDATE: 'BLOCK_DRAG_UPDATE',
+    BLOCK_EVENT: 'BLOCK_EVENT',
+
 
     // Sprite operations
     SPRITE_ADD: 'SPRITE_ADD',
@@ -111,16 +108,11 @@ const deserializeOp = data => {
  * Maps Scratch VM / workspace event types to our operation types.
  */
 const WORKSPACE_EVENT_MAP = {
-    create: OP.BLOCK_CREATE,
-    change: OP.BLOCK_CHANGE,
-    move: OP.BLOCK_MOVE,
-    delete: OP.BLOCK_DELETE,
-    dragOutside: OP.BLOCK_DRAG_UPDATE
+    BLOCK_EVENT: OP.BLOCK_EVENT
 };
 
 module.exports = {
     OP,
-    createOp,
     serializeOp,
     deserializeOp,
     WORKSPACE_EVENT_MAP

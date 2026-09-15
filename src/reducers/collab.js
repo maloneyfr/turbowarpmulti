@@ -14,15 +14,7 @@ const COLLAB_SET_VOICE_STATE = 'scratch-gui/collab/SET_VOICE_STATE';
 const COLLAB_SET_ROOM_CODE = 'scratch-gui/collab/SET_ROOM_CODE';
 const COLLAB_SHOW_JOIN_MODAL = 'scratch-gui/collab/SHOW_JOIN_MODAL';
 
-const loadChatHistory = () => {
-    try {
-        const stored = localStorage.getItem('sokbanawarp-chat');
-        if (stored) return JSON.parse(stored);
-    } catch (e) {
-        console.error('Failed to load chat history', e);
-    }
-    return [];
-};
+const loadChatHistory = () => [];
 
 const collabInitialState = {
     isInSession: false,
@@ -57,7 +49,8 @@ const collabReducer = function (state, action) {
         return Object.assign({}, state, {
             isInSession: action.isInSession,
             isHost: action.isHost,
-            roomCode: action.roomCode
+            roomCode: action.roomCode,
+            chatMessages: action.isInSession ? state.chatMessages : []
         });
     case COLLAB_SET_PEERS:
         return Object.assign({}, state, {
@@ -82,11 +75,6 @@ const collabReducer = function (state, action) {
         });
     case COLLAB_ADD_CHAT_MESSAGE: {
         const newMessages = state.chatMessages.concat([action.message]).slice(-100);
-        try {
-            localStorage.setItem('sokbanawarp-chat', JSON.stringify(newMessages));
-        } catch (e) {
-            console.error('Failed to save chat history', e);
-        }
         return Object.assign({}, state, {
             chatMessages: newMessages // Keep last 100
         });
