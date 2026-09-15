@@ -1011,6 +1011,12 @@ class MenuBar extends React.Component {
                             />
                         ) : []))}
                     </div>
+                    {/* tw: add collaboration button */}
+                    {this.props.collabButton && (
+                        <div className={styles.menuBarItem}>
+                            {this.props.collabButton}
+                        </div>
+                    )}
                     {/* tw: add a feedback button */}
                     <div className={styles.menuBarItem}>
                         <a
@@ -1072,6 +1078,7 @@ MenuBar.propTypes = {
     canSave: PropTypes.bool,
     canShare: PropTypes.bool,
     className: PropTypes.string,
+    collabButton: PropTypes.node,
     errors: PropTypes.arrayOf(PropTypes.shape({
         sprite: PropTypes.string,
         error: PropTypes.string,

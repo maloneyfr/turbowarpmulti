@@ -2,6 +2,7 @@ import {applyMiddleware, compose, combineReducers} from 'redux';
 import alertsReducer, {alertsInitialState} from './alerts';
 import assetDragReducer, {assetDragInitialState} from './asset-drag';
 import cardsReducer, {cardsInitialState} from './cards';
+import collabReducer, {collabInitialState} from './collab';
 import colorPickerReducer, {colorPickerInitialState} from './color-picker';
 import connectionModalReducer, {connectionModalInitialState} from './connection-modal';
 import customProceduresReducer, {customProceduresInitialState} from './custom-procedures';
@@ -41,6 +42,7 @@ const guiInitialState = {
     assetDrag: assetDragInitialState,
     blockDrag: blockDragInitialState,
     cards: cardsInitialState,
+    collab: collabInitialState,
     colorPicker: colorPickerInitialState,
     connectionModal: connectionModalInitialState,
     customStageSize: customStageSizeInitialState,
@@ -147,6 +149,7 @@ const guiReducer = combineReducers({
     assetDrag: assetDragReducer,
     blockDrag: blockDragReducer,
     cards: cardsReducer,
+    collab: collabReducer,
     colorPicker: colorPickerReducer,
     connectionModal: connectionModalReducer,
     customStageSize: customStageSizeReducer,

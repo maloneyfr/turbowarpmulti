@@ -9,7 +9,7 @@
     "type": "git",
     "url": "https://github.com/LLK/scratch-gui.git"
   },
-  "main": "./dist/scratch-gui.js",
+  "main": "electron-main.js",
   "scripts": {
     "build": "npm run clean && webpack --colors --bail",
     "clean": "rimraf ./build && mkdirp build && rimraf ./dist && mkdirp dist",
@@ -19,12 +19,31 @@
     "i18n:push": "tx-push-src scratch-editor interface translations/en.json",
     "i18n:src": "rimraf ./translations/messages/src && babel src > tmp.js && rimraf tmp.js && build-i18n-src ./translations/messages/src ./translations/",
     "start": "webpack-dev-server",
+    "electron:start": "npm run build && electron .",
+    "dist": "npm run build && electron-builder --win nsis portable",
     "test": "npm run test:lint && npm run test:unit && npm run build && npm run test:integration",
     "test:integration": "jest --maxWorkers=4 test[\\\\/]integration",
     "test:lint": "eslint . --ext .js,.jsx",
     "test:unit": "jest test[\\\\/]unit[\\\\/]addons",
     "test:smoke": "jest --runInBand test[\\\\/]smoke",
     "watch": "webpack --colors --watch"
+  },
+  "build": {
+    "appId": "com.sokbanawarp.app",
+    "productName": "Sokbanawarp",
+    "directories": {
+      "output": "dist-electron"
+    },
+    "files": [
+      "electron-main.js",
+      "build/**/*"
+    ],
+    "win": {
+      "target": [
+        "nsis",
+        "portable"
+      ]
+    }
   },
   "config": {
     "commitizen": {
@@ -65,6 +84,7 @@
     "lodash.throttle": "4.0.1",
     "omggif": "1.0.9",
     "papaparse": "5.3.0",
+    "peerjs": "^1.4.7",
     "postcss-import": "^12.0.0",
     "postcss-loader": "^3.0.0",
     "postcss-simple-vars": "^5.0.1",
@@ -115,6 +135,8 @@
     "babel-eslint": "10.1.0",
     "babel-loader": "8.3.0",
     "chromedriver": "117.0.3",
+    "electron": "^33.3.1",
+    "electron-builder": "^25.1.8",
     "enzyme": "3.10.0",
     "enzyme-adapter-react-16": "1.15.7",
     "eslint": "8.55.0",

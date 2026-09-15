@@ -1,0 +1,46 @@
+.indicatorContainer {
+    position: absolute;
+    top: 4px;
+    right: 4px;
+    display: flex;
+    gap: 3px;
+    z-index: 10;
+}
+
+.indicator {
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    border: 2px solid rgba(0, 0, 0, 0.3);
+    box-shadow: 0 0 6px var(--indicator-glow, rgba(255, 255, 255, 0.5));
+    animation: indicatorPulse 2s ease-in-out infinite;
+    cursor: default;
+    position: relative;
+}
+
+@keyframes indicatorPulse {
+    0%, 100% { transform: scale(1); }
+    50% { transform: scale(1.15); }
+}
+
+.tooltip {
+    position: absolute;
+    bottom: 100%;
+    right: 0;
+    background: rgba(0, 0, 0, 0.85);
+    color: #fff;
+    padding: 3px 8px;
+    border-radius: 4px;
+    font-size: 0.6rem;
+    white-space: nowrap;
+    pointer-events: none;
+    opacity: 0;
+    transform: translateY(4px);
+    transition: all 0.15s ease;
+    margin-bottom: 4px;
+}
+
+.indicator:hover .tooltip {
+    opacity: 1;
+    transform: translateY(0);
+}

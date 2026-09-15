@@ -1,0 +1,382 @@
+.panelOverlay {
+    position: fixed;
+    top: 0;
+    right: 0;
+    bottom: 0;
+    width: 320px;
+    z-index: 9998;
+    pointer-events: none;
+    display: flex;
+    flex-direction: column;
+}
+
+.panel {
+    position: absolute;
+    top: 48px;
+    right: 8px;
+    bottom: 8px;
+    width: 304px;
+    background: linear-gradient(165deg, #1a1a2e 0%, #16213e 100%);
+    border-radius: 16px;
+    box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5), 0 0 0 1px rgba(255, 255, 255, 0.08);
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    pointer-events: auto;
+    animation: slideIn 0.3s ease-out;
+}
+
+@keyframes slideIn {
+    from { opacity: 0; transform: translateX(20px); }
+    to { opacity: 1; transform: translateX(0); }
+}
+
+.panelHeader {
+    padding: 16px 16px 12px;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+}
+
+.panelTitle {
+    font-size: 0.85rem;
+    font-weight: 700;
+    color: #fff;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.statusDot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: #43e97b;
+    box-shadow: 0 0 8px rgba(67, 233, 123, 0.6);
+}
+
+.closePanel {
+    background: rgba(255, 255, 255, 0.06);
+    border: none;
+    color: #888;
+    font-size: 0.9rem;
+    cursor: pointer;
+    width: 28px;
+    height: 28px;
+    border-radius: 8px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.2s;
+}
+
+.closePanel:hover {
+    background: rgba(255, 255, 255, 0.12);
+    color: #fff;
+}
+
+.roomInfo {
+    padding: 12px 16px;
+    background: rgba(102, 126, 234, 0.08);
+    border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+.roomCodeRow {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+}
+
+.roomLabel {
+    color: #888;
+    font-size: 0.65rem;
+    text-transform: uppercase;
+    letter-spacing: 1.5px;
+}
+
+.roomCodeSmall {
+    font-family: 'Courier New', monospace;
+    font-size: 0.9rem;
+    font-weight: 700;
+    color: #667eea;
+    letter-spacing: 3px;
+    cursor: pointer;
+    transition: color 0.2s;
+}
+
+.roomCodeSmall:hover {
+    color: #8b9ff5;
+}
+
+.sectionTitle {
+    color: #666;
+    font-size: 0.65rem;
+    text-transform: uppercase;
+    letter-spacing: 1.5px;
+    padding: 12px 16px 6px;
+}
+
+.peerList {
+    flex: 1;
+    overflow-y: auto;
+    padding: 0 8px;
+    min-height: 0;
+}
+
+.peerItem {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 8px;
+    border-radius: 10px;
+    transition: background 0.2s;
+}
+
+.peerItem:hover {
+    background: rgba(255, 255, 255, 0.04);
+}
+
+.peerColorDot {
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    flex-shrink: 0;
+    box-shadow: 0 0 8px var(--dot-glow, rgba(255, 255, 255, 0.3));
+}
+
+.peerInfo {
+    flex: 1;
+    min-width: 0;
+}
+
+.peerName {
+    color: #ddd;
+    font-size: 0.78rem;
+    font-weight: 600;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.peerSprite {
+    color: #666;
+    font-size: 0.65rem;
+    margin-top: 1px;
+}
+
+.peerHost {
+    font-size: 0.6rem;
+    color: #ffb347;
+    background: rgba(255, 179, 71, 0.12);
+    padding: 1px 6px;
+    border-radius: 4px;
+    font-weight: 600;
+}
+
+.peerYou {
+    font-size: 0.6rem;
+    color: #43e97b;
+    background: rgba(67, 233, 123, 0.12);
+    padding: 1px 6px;
+    border-radius: 4px;
+    font-weight: 600;
+}
+
+.peerMuted {
+    color: #ff6b6b;
+    font-size: 0.7rem;
+}
+
+/* Voice controls */
+.voiceSection {
+    padding: 8px 12px;
+    border-top: 1px solid rgba(255, 255, 255, 0.06);
+    display: flex;
+    gap: 6px;
+}
+
+.voiceButton {
+    flex: 1;
+    padding: 8px;
+    border: none;
+    border-radius: 10px;
+    font-size: 0.7rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 4px;
+}
+
+.voiceJoin {
+    background: rgba(67, 233, 123, 0.15);
+    color: #43e97b;
+}
+
+.voiceJoin:hover {
+    background: rgba(67, 233, 123, 0.25);
+}
+
+.voiceMute {
+    background: rgba(255, 255, 255, 0.06);
+    color: #ddd;
+}
+
+.voiceMute:hover {
+    background: rgba(255, 255, 255, 0.1);
+}
+
+.voiceMuted {
+    background: rgba(255, 107, 107, 0.15);
+    color: #ff6b6b;
+}
+
+.voiceDeafen {
+    background: rgba(255, 255, 255, 0.06);
+    color: #ddd;
+}
+
+.voiceDeafen:hover {
+    background: rgba(255, 255, 255, 0.1);
+}
+
+.voiceDeafened {
+    background: rgba(255, 107, 107, 0.15);
+    color: #ff6b6b;
+}
+
+.voiceLeave {
+    background: rgba(255, 107, 107, 0.12);
+    color: #ff6b6b;
+}
+
+.voiceLeave:hover {
+    background: rgba(255, 107, 107, 0.2);
+}
+
+/* Chat section */
+.chatSection {
+    border-top: 1px solid rgba(255, 255, 255, 0.06);
+    display: flex;
+    flex-direction: column;
+    max-height: 200px;
+    min-height: 120px;
+}
+
+.chatToggle {
+    padding: 8px 16px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    cursor: pointer;
+    transition: background 0.2s;
+}
+
+.chatToggle:hover {
+    background: rgba(255, 255, 255, 0.04);
+}
+
+.chatLabel {
+    color: #888;
+    font-size: 0.7rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+}
+
+.chatToggleIcon {
+    color: #666;
+    font-size: 0.7rem;
+}
+
+.chatMessages {
+    flex: 1;
+    overflow-y: auto;
+    padding: 4px 12px;
+    min-height: 0;
+}
+
+.chatMessage {
+    margin-bottom: 6px;
+    font-size: 0.72rem;
+    line-height: 1.4;
+}
+
+.chatSender {
+    font-weight: 700;
+    margin-right: 4px;
+}
+
+.chatText {
+    color: #ccc;
+    word-break: break-word;
+}
+
+.chatInputRow {
+    display: flex;
+    padding: 6px 12px 10px;
+    gap: 6px;
+}
+
+.chatInput {
+    flex: 1;
+    background: rgba(255, 255, 255, 0.06);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: 8px;
+    padding: 6px 10px;
+    color: #fff;
+    font-size: 0.72rem;
+    outline: none;
+    transition: border-color 0.2s;
+}
+
+.chatInput:focus {
+    border-color: #667eea;
+}
+
+.chatInput::placeholder {
+    color: #555;
+}
+
+.chatSend {
+    background: linear-gradient(135deg, #667eea, #764ba2);
+    border: none;
+    color: white;
+    padding: 6px 12px;
+    border-radius: 8px;
+    font-size: 0.72rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: opacity 0.2s;
+}
+
+.chatSend:hover {
+    opacity: 0.9;
+}
+
+/* Leave button */
+.leaveSection {
+    padding: 8px 12px 12px;
+    border-top: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+.leaveButton {
+    width: 100%;
+    padding: 10px;
+    background: rgba(255, 107, 107, 0.1);
+    border: 1px solid rgba(255, 107, 107, 0.2);
+    border-radius: 10px;
+    color: #ff6b6b;
+    font-size: 0.75rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.leaveButton:hover {
+    background: rgba(255, 107, 107, 0.2);
+    border-color: rgba(255, 107, 107, 0.4);
+}

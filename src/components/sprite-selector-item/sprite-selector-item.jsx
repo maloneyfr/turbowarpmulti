@@ -3,6 +3,7 @@ import PropTypes from 'prop-types';
 import React from 'react';
 
 import DeleteButton from '../delete-button/delete-button.jsx';
+import CollabSpriteIndicator from '../collab-sprite-indicator/collab-sprite-indicator.jsx';
 import styles from './sprite-selector-item.css';
 import {ContextMenuTrigger} from 'react-contextmenu';
 import {DangerousMenuItem, ContextMenu, MenuItem} from '../context-menu/context-menu.jsx';
@@ -21,7 +22,10 @@ const SpriteSelectorItem = props => (
             onMouseEnter: props.onMouseEnter,
             onMouseLeave: props.onMouseLeave,
             onMouseDown: props.onMouseDown,
-            onTouchStart: props.onMouseDown
+            onTouchStart: props.onMouseDown,
+            style: props.collabPeers && props.collabPeers.length > 0 ? {
+                boxShadow: `inset 0 0 0 2px ${props.collabPeers[0].color ? props.collabPeers[0].color.hex : '#888'}40`
+            } : undefined
         }}
         disable={props.preventContextMenu}
         id={`${props.name}-${contextMenuId}`}
@@ -40,6 +44,8 @@ const SpriteSelectorItem = props => (
                         src={props.costumeURL}
                     />
                 </div>
+                {/* Collaboration peer indicators */}
+                <CollabSpriteIndicator peers={props.collabPeers} />
             </div>
         ) : null}
         <div className={styles.spriteInfo}>
@@ -99,6 +105,7 @@ const SpriteSelectorItem = props => (
 
 SpriteSelectorItem.propTypes = {
     className: PropTypes.string,
+    collabPeers: PropTypes.array,
     componentRef: PropTypes.func,
     costumeURL: PropTypes.string,
     details: PropTypes.string,
@@ -118,3 +125,4 @@ SpriteSelectorItem.propTypes = {
 };
 
 export default SpriteSelectorItem;
+

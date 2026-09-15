@@ -178,12 +178,18 @@ SpriteSelectorItem.propTypes = {
     vm: PropTypes.instanceOf(VM).isRequired
 };
 
-const mapStateToProps = (state, {id}) => ({
-    dragging: state.scratchGui.assetDrag.dragging,
-    receivedBlocks: state.scratchGui.hoveredTarget.receivedBlocks &&
-            state.scratchGui.hoveredTarget.sprite === id,
-    vm: state.scratchGui.vm
-});
+const mapStateToProps = (state, {id}) => {
+    const collabPeers = state.scratchGui.collab.peers.filter(
+        peer => peer.currentTargetId === id
+    );
+    return {
+        dragging: state.scratchGui.assetDrag.dragging,
+        receivedBlocks: state.scratchGui.hoveredTarget.receivedBlocks &&
+                state.scratchGui.hoveredTarget.sprite === id,
+        vm: state.scratchGui.vm,
+        collabPeers: collabPeers.length > 0 ? collabPeers : undefined
+    };
+};
 const mapDispatchToProps = dispatch => ({
     dispatchSetHoveredSprite: spriteId => {
         dispatch(setHoveredSprite(spriteId));

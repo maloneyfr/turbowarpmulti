@@ -97,6 +97,7 @@ const GUIComponent = props => {
         canShare,
         canUseCloud,
         children,
+        collabButton,
         connectionModalVisible,
         costumeLibraryVisible,
         costumesTabVisible,
@@ -301,6 +302,7 @@ const GUIComponent = props => {
                     canSave={canSave}
                     canShare={canShare}
                     className={styles.menuBarPosition}
+                    collabButton={collabButton}
                     enableCommunity={enableCommunity}
                     isShared={isShared}
                     isTotallyNormal={isTotallyNormal}
