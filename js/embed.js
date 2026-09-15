@@ -39307,7 +39307,8 @@ class CollabVMListener {
         this._originalBlockListener(e);
       }
 
-      // If this is a remote operation, don't broadcast
+      // Prevent infinite loop: ignore events spawned by our remote sync
+      if (e.group === 'remote_sync') return;
       if (this.collab.isRemoteOperation) return;
 
       // Convert workspace event to collab operation
@@ -39481,9 +39482,12 @@ class CollabVMListener {
     if (!workspace) return;
     try {
       const event = window.ScratchBlocks.Events.fromJson(payload, workspace);
-      // Run forward natively. This triggers workspace change events which the patched blockListener
-      // will catch but NOT broadcast because this.collab._isRemoteOperation is true.
+      // Run forward natively. We set a custom group so the patched blockListener
+      // can ignore the resulting async events and avoid infinite loops.
+      const prevGroup = window.ScratchBlocks.Events.getGroup();
+      window.ScratchBlocks.Events.setGroup('remote_sync');
       event.run(true);
+      window.ScratchBlocks.Events.setGroup(prevGroup);
     } catch (err) {
       console.error('Failed to apply remote block event:', err);
     }
