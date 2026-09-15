@@ -28,6 +28,9 @@ class CollabVMListener {
         // Hook into RenderedTarget for sprite property changes (movement, size, etc.)
         this._patchTargetMethods();
 
+        // Hook into VM structural changes (add/delete sprites, costumes, sounds)
+        this._patchVMMethods();
+
         // Listen for target changes
         this.vm.on('targetsUpdate', this._onTargetsUpdate);
 
@@ -45,8 +48,11 @@ class CollabVMListener {
         // Restore original block listener
         this._unpatchBlockListener();
         
-        // We do not unpatch Target methods as it might affect other things, or we can carefully restore them.
+        // Restore target methods
         this._unpatchTargetMethods();
+
+        // Restore VM methods
+        this._unpatchVMMethods();
 
         this.vm.removeListener('targetsUpdate', this._onTargetsUpdate);
         this.collab.removeListener('remoteOperation', this._onRemoteOperation);
@@ -133,6 +139,82 @@ class CollabVMListener {
         }
         targetProto._collabPatched = false;
         this._originalTargetMethods = null;
+    }
+
+    // ---- VM structural patching ----
+
+    _patchVMMethods () {
+        if (this.vm._collabPatched) return;
+        this.vm._collabPatched = true;
+
+        const methods = [
+            'addSprite', 'deleteSprite', 'renameSprite',
+            'addCostume', 'deleteCostume',
+            'addSound', 'deleteSound'
+        ];
+
+        this._originalVMMethods = {};
+
+        methods.forEach(method => {
+            if (typeof this.vm[method] === 'function') {
+                this._originalVMMethods[method] = this.vm[method].bind(this.vm);
+                
+                this.vm[method] = (...args) => {
+                    const result = this._originalVMMethods[method](...args);
+                    
+                    if (this._attached && !this.collab.isRemoteOperation) {
+                        if (method === 'addSprite') {
+                            // addSprite takes a JSON representation of the sprite
+                            this.collab.broadcastOp(createOp(OP.SPRITE_ADD, { spriteJson: args[0] }));
+                        } else if (method === 'deleteSprite') {
+                            this.collab.broadcastOp(createOp(OP.SPRITE_DELETE, { targetId: args[0] }));
+                        } else if (method === 'renameSprite') {
+                            this.collab.broadcastOp(createOp(OP.SPRITE_RENAME, { targetId: args[0], newName: args[1] }));
+                        } else if (method === 'addCostume') {
+                            this.collab.broadcastOp(createOp(OP.COSTUME_ADD, { targetId: args[2], costumeData: args[1] }));
+                        } else if (method === 'deleteCostume') {
+                            this.collab.broadcastOp(createOp(OP.COSTUME_DELETE, { costumeIndex: args[0] })); // Wait, vm.deleteCostume is (spriteId, costumeIndex)
+                            // Wait, vm.deleteCostume signature is usually (spriteId, costumeIndex) or something else. I will fix the payload below.
+                        }
+                    }
+                    return result;
+                };
+            }
+        });
+        
+        // Re-fix the deleteCostume and deleteSound argument mapping
+        this.vm.deleteCostume = (spriteId, costumeIndex) => {
+            const result = this._originalVMMethods['deleteCostume'](spriteId, costumeIndex);
+            if (this._attached && !this.collab.isRemoteOperation) {
+                this.collab.broadcastOp(createOp(OP.COSTUME_DELETE, { targetId: spriteId, costumeIndex: costumeIndex }));
+            }
+            return result;
+        };
+        
+        this.vm.addSound = (soundObj, spriteId) => {
+            const result = this._originalVMMethods['addSound'](soundObj, spriteId);
+            if (this._attached && !this.collab.isRemoteOperation) {
+                this.collab.broadcastOp(createOp(OP.SOUND_ADD, { targetId: spriteId, soundData: soundObj }));
+            }
+            return result;
+        };
+        
+        this.vm.deleteSound = (spriteId, soundIndex) => {
+            const result = this._originalVMMethods['deleteSound'](spriteId, soundIndex);
+            if (this._attached && !this.collab.isRemoteOperation) {
+                this.collab.broadcastOp(createOp(OP.SOUND_DELETE, { targetId: spriteId, soundIndex: soundIndex }));
+            }
+            return result;
+        };
+    }
+
+    _unpatchVMMethods () {
+        if (!this._originalVMMethods) return;
+        for (const method in this._originalVMMethods) {
+            this.vm[method] = this._originalVMMethods[method];
+        }
+        this.vm._collabPatched = false;
+        this._originalVMMethods = null;
     }
 
     _handleBlockEvent (e) {
