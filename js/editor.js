@@ -41527,6 +41527,7 @@ const WORKSPACE_EVENT_MAP = {
 };
 module.exports = {
   OP,
+  createOp,
   serializeOp,
   deserializeOp,
   WORKSPACE_EVENT_MAP
